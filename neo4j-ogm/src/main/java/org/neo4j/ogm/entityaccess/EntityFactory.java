@@ -60,7 +60,7 @@ public class EntityFactory {
 
     private <T> T instantiateObjectFromTaxa(String... taxa) {
 
-        if (taxa.length == 0) {
+        if (taxa == null || taxa.length == 0) {
             throw new MappingException("Cannot map to a class with no taxa by which to determine the class name.");
         }
 
