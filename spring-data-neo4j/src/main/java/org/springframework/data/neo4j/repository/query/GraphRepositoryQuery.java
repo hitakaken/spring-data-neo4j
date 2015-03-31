@@ -12,15 +12,29 @@
 
 package org.springframework.data.neo4j.repository.query;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.neo4j.ogm.cypher.query.RowModelQuery;
+import org.neo4j.ogm.mapper.AdHocEntityMapper;
+import org.neo4j.ogm.metadata.MetaData;
+import org.neo4j.ogm.model.GraphModel;
+import org.neo4j.ogm.model.NodeModel;
+import org.neo4j.ogm.session.GraphCallback;
 import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.request.RequestHandler;
+import org.neo4j.ogm.session.response.Neo4jResponse;
+import org.neo4j.ogm.session.result.RowModel;
+import org.neo4j.ogm.session.transaction.Transaction;
+import org.springframework.data.neo4j.annotation.QueryResult;
 import org.springframework.data.repository.query.Parameter;
 import org.springframework.data.repository.query.Parameters;
 import org.springframework.data.repository.query.RepositoryQuery;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @author Mark Angrish
@@ -53,10 +67,44 @@ public class GraphRepositoryQuery implements RepositoryQuery {
             if (Map.class.isAssignableFrom(concreteType)) {
                 return session.query(graphQueryMethod.getQuery(), params);
             }
+
+            if (concreteType.isAnnotationPresent(QueryResult.class)) {
+                // TODO: add singleton support
+                return processQueryResult(concreteType, graphQueryMethod.getQuery(), params);
+            }
             return session.query(concreteType, graphQueryMethod.getQuery(), params);
         } else {
             return session.queryForObject(returnType, graphQueryMethod.getQuery(), params);
         }
+    }
+
+    private Object processQueryResult(final Class<?> queryResultType, String cypher, Map<String, Object> parameters) {
+        final RowModelQuery qry = new RowModelQuery(cypher, parameters);
+        return this.session.doInTransaction(new GraphCallback() {
+            @Override
+            public Object apply(RequestHandler requestHandler, Transaction transaction, MetaData metaData) {
+                try (Neo4jResponse<RowModel> response = requestHandler.execute(qry, transaction.url())) {
+                    // the tactic here is to turn each row into a NodeModel and pretend our @QueryResult class is a node entity...
+                    // TODO: improve to process a row model properly
+                    List<NodeModel> nodes = new ArrayList<NodeModel>();
+                    for (RowModel rowModel = response.next() ; rowModel != null ; rowModel = response.next()) {
+                        Map<String, Object> resultSet = new HashMap<>();
+                        for (int i = 0; i < rowModel.getValues().length; i++) {
+                            resultSet.put(response.columns()[i], rowModel.getValues()[i]);
+                        }
+
+                        NodeModel node = new NodeModel();
+                        node.setProperties(resultSet);
+                        nodes.add(node);
+                    }
+                    GraphModel graphModel = new GraphModel();
+                    graphModel.setNodes(nodes.toArray(new NodeModel[nodes.size()]));
+
+                    return new AdHocEntityMapper(metaData).map(queryResultType, graphModel);
+                }
+            }
+        });
+
     }
 
     private Map<String, Object> resolveParams(Object[] parameters) {

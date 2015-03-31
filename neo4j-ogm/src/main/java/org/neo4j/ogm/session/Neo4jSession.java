@@ -13,6 +13,7 @@
 package org.neo4j.ogm.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.neo4j.ogm.annotation.RelationshipEntity;
@@ -51,7 +52,6 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -193,7 +193,6 @@ public class Neo4jSession implements Session {
         return tx;
     }
 
-
     @Override
     public <T> T queryForObject(Class<T> type, String cypher, Map<String, ?> parameters) {
         Iterable<T> results = query(type, cypher, parameters);
@@ -213,44 +212,18 @@ public class Neo4jSession implements Session {
 
     @Override
     public Iterable<Map<String, Object>> query(String cypher, Map<String, ?> parameters) {
-        if (StringUtils.isEmpty(cypher)) {
-            throw new RuntimeException("Supplied cypher statement must not be null or empty.");
-        }
-
-        if (parameters == null) {
-            throw new RuntimeException("Supplied Parameters cannot be null.");
-        }
-
-        assertReadOnly(cypher);
-
-        String url = getOrCreateTransaction().url();
-        RowModelQuery qry = new RowModelQuery(cypher, parameters);
-        try (Neo4jResponse<RowModel> response = getRequestHandler().execute(qry, url)) {
-
-            String[] variables = response.columns();
-
-            List<Map<String, Object>> result = new ArrayList<>();
-            RowModel rowModel;
-
-            while ((rowModel = response.next()) != null) {
-                Object[] results = rowModel.getValues();
-                Map<String, Object> element = new HashMap<>();
-                for (int i = 0; i < variables.length; i++) {
-                    element.put(variables[i], results[i]);
-                }
-                result.add(element);
-            }
-
-            return result;
-        }
+        return executeAndMap(null, cypher, parameters, new MapRowModelMapper());
     }
 
     @Override
     public <T> Iterable<T> query(Class<T> type, String cypher, Map<String, ?> parameters) {
         if (type == null || type.equals(Void.class)) {
-            throw new RuntimeException("Supplied type must not be nul or void.");
+            throw new RuntimeException("Supplied type must not be null or void.");
         }
+        return executeAndMap(type, cypher, parameters, new EntityRowModelMapper<T>());
+    }
 
+    private <T> Iterable<T> executeAndMap(Class<T> type, String cypher, Map<String, ?> parameters, RowModelMapper<T> rowModelMapper) {
         if (StringUtils.isEmpty(cypher)) {
             throw new RuntimeException("Supplied cypher statement must not be null or empty.");
         }
@@ -263,7 +236,7 @@ public class Neo4jSession implements Session {
 
         String url = getOrCreateTransaction().url();
 
-        if (metaData.classInfo(type.getSimpleName()) != null) {
+        if (type != null && metaData.classInfo(type.getSimpleName()) != null) {
             GraphModelQuery qry = new GraphModelQuery(cypher, parameters);
             try (Neo4jResponse<GraphModel> response = getRequestHandler().execute(qry, url)) {
                 return getResponseHandler().loadAll(type, response);
@@ -275,17 +248,10 @@ public class Neo4jSession implements Session {
 
                 String[] variables = response.columns();
 
-                if (variables.length > 1) {
-                    throw new RuntimeException("Scalar response queries must only return one column. Make sure your cypher query only returns one item.");
-                }
-
                 Collection<T> result = new ArrayList<>();
                 RowModel rowModel;
                 while ((rowModel = response.next()) != null) {
-                    Object[] results = rowModel.getValues();
-                    for (int i = 0; i < variables.length; i++) {
-                        result.add((T)results[i]);
-                    }
+                    rowModelMapper.mapIntoResult(result, rowModel.getValues(), variables);
                 }
 
                 return result;
@@ -318,6 +284,10 @@ public class Neo4jSession implements Session {
         getRequestHandler().execute(qry, url).close();
     }
 
+    @Override
+    public Object doInTransaction(GraphCallback graphCallback) {
+        return graphCallback.apply(getRequestHandler(), getOrCreateTransaction(), this.metaData);
+    }
 
     @Override
     public void execute(String statement) {

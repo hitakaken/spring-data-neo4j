@@ -19,12 +19,15 @@ import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.neo4j.integration.movies.context.PersistenceContext;
 import org.springframework.data.neo4j.integration.movies.domain.User;
+import org.springframework.data.neo4j.integration.movies.domain.UserQueryResult;
 import org.springframework.data.neo4j.integration.movies.repo.UserRepository;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,9 +50,13 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
         return 7879;
     }
 
+    private void executeUpdate(String cypher) {
+        new ExecutionEngine(getDatabase()).execute(cypher);
+    }
+
     @Test
     public void shouldFindArbitraryGraph() {
-        new ExecutionEngine(getDatabase()).execute(
+        executeUpdate(
                 "CREATE " +
                         "(dh:Movie {title:'Die Hard'}), " +
                         "(fe:Movie {title: 'The Fifth Element'}), " +
@@ -74,7 +81,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindUsersByName() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
 
         Collection<User> users = userRepository.findByName("Michal");
         Iterator<User> iterator = users.iterator();
@@ -85,7 +92,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindUsersByMiddleName() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {middleName:'Joseph'})<-[:FRIEND_OF]-(a:User {middleName:'Mary'})");
+        executeUpdate("CREATE (m:User {middleName:'Joseph'})<-[:FRIEND_OF]-(a:User {middleName:'Mary'})");
 
         Collection<User> users = userRepository.findByMiddleName("Joseph");
         Iterator<User> iterator = users.iterator();
@@ -96,14 +103,14 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindScalarValues() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
         List<Integer> ids = userRepository.getUserIds();
         assertEquals(2, ids.size());
     }
 
     @Test
     public void shouldFindUserByName() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
 
         User user = userRepository.findUserByName("Michal");
         assertEquals("Michal",user.getName());
@@ -111,7 +118,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindTotalUsers() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
 
         int users = userRepository.findTotalUsers();
         assertEquals(users, 2);
@@ -119,7 +126,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindUsers() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
 
         Collection<User> users = userRepository.getAllUsers();
         assertEquals(users.size(), 2);
@@ -127,7 +134,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindUserByNameWithNamedParam() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
 
         User user = userRepository.findUserByNameWithNamedParam("Michal");
         assertEquals("Michal",user.getName());
@@ -135,7 +142,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
 
     @Test
     public void shouldFindUsersAsProperties() {
-        new ExecutionEngine(getDatabase()).execute("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
+        executeUpdate("CREATE (m:User {name:'Michal'})<-[:FRIEND_OF]-(a:User {name:'Adam'})");
 
         Iterable<Map<String, Object>> users = userRepository.getUsersAsProperties();
         assertNotNull(users);
@@ -145,6 +152,26 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
             assertNotNull(properties);
         }
         assertEquals(2, i);
+    }
+
+    @Test
+    public void shouldFindUsersAndMapThemToConcreteQueryResultObjectCollection() {
+        executeUpdate("CREATE (g:User {name:'Gary', age:32}), (s:User {name:'Sheila', age:29}), (v:User {name:'Vince', age:66})");
+        assertEquals("There should be some users in the database", 3, userRepository.findTotalUsers());
+
+        // NB: UserQueryResult is not scanned with the other domain classes
+        Iterable<UserQueryResult> expected = Arrays.asList(new UserQueryResult("Sheila", 29),
+                new UserQueryResult("Gary", 32), new UserQueryResult("Vince", 66));
+
+        Iterable<UserQueryResult> queryResult = userRepository.retrieveAllUsersAndTheirAges();
+        assertNotNull("The query result shouldn't be null", queryResult);
+        assertEquals(expected, queryResult);
+    }
+
+    @org.junit.Ignore
+    @Test
+    public void shouldFindUsersAndMapThemToProxiedQueryResultInterface() {
+        fail("Need to write this test");
     }
 
 }

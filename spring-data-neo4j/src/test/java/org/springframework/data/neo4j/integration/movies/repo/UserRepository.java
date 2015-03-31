@@ -14,6 +14,7 @@ package org.springframework.data.neo4j.integration.movies.repo;
 
 import org.springframework.data.neo4j.annotation.Query;
 import org.springframework.data.neo4j.integration.movies.domain.User;
+import org.springframework.data.neo4j.integration.movies.domain.UserQueryResult;
 import org.springframework.data.neo4j.repository.GraphRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -52,4 +53,8 @@ public interface UserRepository extends GraphRepository<User> {
 
     @Query("MATCH (user:User{name:{0}}) RETURN user")
     User findUserByName(String name);
+
+    @Query("MATCH (user:User) RETURN id(user) AS userId, user.name AS userName, user.age ORDER BY user.age")
+    Iterable<UserQueryResult> retrieveAllUsersAndTheirAges();
+
 }
