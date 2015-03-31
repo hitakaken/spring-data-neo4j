@@ -130,7 +130,7 @@ public interface Session {
      * @return The result of calling the given {@link GraphCallback}
      * @throws NullPointerException if invoked with <code>null</code>
      */
-    Object doInTransaction(GraphCallback graphCallback);
+    <T> T doInTransaction(GraphCallback<T> graphCallback);
 
     /**
      * Counts all the <em>node</em> entities of the specified type.

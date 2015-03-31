@@ -12,8 +12,10 @@
 
 package org.neo4j.ogm.mapper;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.neo4j.ogm.entityaccess.DefaultEntityAccessStrategy;
 import org.neo4j.ogm.entityaccess.EntityAccess;
@@ -21,64 +23,73 @@ import org.neo4j.ogm.entityaccess.EntityAccessStrategy;
 import org.neo4j.ogm.entityaccess.EntityFactory;
 import org.neo4j.ogm.entityaccess.PropertyReader;
 import org.neo4j.ogm.entityaccess.PropertyWriter;
+import org.neo4j.ogm.metadata.MappingException;
 import org.neo4j.ogm.metadata.MetaData;
 import org.neo4j.ogm.metadata.info.ClassInfo;
-import org.neo4j.ogm.model.GraphModel;
-import org.neo4j.ogm.model.NodeModel;
-import org.neo4j.ogm.model.Property;
+import org.neo4j.ogm.session.result.RowModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Simple implementation of {@link GraphToEntityMapper} suitable for ad-hoc entity mappings. This doesn't interact with a
+ * Simple graph-to-entity mapper suitable for ad-hoc, one-off mappings.  This doesn't interact with a
  * mapping context or mandate graph IDs on the target types and is not designed for use in the OGM session.
  *
  * @author Adam George
  */
-public class AdHocEntityMapper implements GraphToEntityMapper<GraphModel> {
+public class SingleUseEntityMapper {
 
-    private static final Logger logger = LoggerFactory.getLogger(AdHocEntityMapper.class);
+    private static final Logger logger = LoggerFactory.getLogger(SingleUseEntityMapper.class);
 
     private final EntityAccessStrategy entityAccessStrategy;
     private final EntityFactory entityFactory;
     private final MetaData metadata;
 
-    private ClassInfo classInfo;
-
-    public AdHocEntityMapper(MetaData mappingMetaData) {
+    /**
+     * Constructs a new {@link SingleUseEntityMapper} based on the given mapping {@link MetaData}.
+     *
+     * @param mappingMetaData The {@link MetaData} to use for performing mappings
+     */
+    public SingleUseEntityMapper(MetaData mappingMetaData) {
         this.metadata = mappingMetaData;
         this.entityFactory = new EntityFactory(mappingMetaData);
         this.entityAccessStrategy = new DefaultEntityAccessStrategy();
     }
 
-    public AdHocEntityMapper(ClassInfo classInfo) {
-        this.metadata = null;
-        this.entityFactory = new EntityFactory(null);
-        this.entityAccessStrategy = new DefaultEntityAccessStrategy();
-        this.classInfo = classInfo;
-    }
-
-    @Override
-    public <T> Collection<T> map(Class<T> type, GraphModel graphModel) {
-        Collection<T> col = new ArrayList<>(graphModel.getNodes().length);
-        for (NodeModel node : graphModel.getNodes()) {
-            T entity = this.entityFactory.newObject(type);
-            setProperties(node, entity);
-            col.add(entity);
+    public <T> T map(Class<T> type, String[] columnNames, RowModel rowModel) {
+        Map<String, Object> properties = new HashMap<>();
+        for (int i = 0; i < rowModel.getValues().length; i++) {
+            properties.put(columnNames[i], rowModel.getValues()[i]);
         }
-        return col;
+
+        T entity = this.entityFactory.newObject(type);
+        setProperties(entity, properties);
+        return entity;
     }
 
-    private void setProperties(NodeModel nodeModel, Object instance) {
-        ClassInfo classInfo = this.classInfo == null ? this.metadata.classInfo(instance) : this.classInfo;
-        for (Property<?, ?> property : nodeModel.getPropertyList()) {
-            writeProperty(classInfo, instance, property);
+    private void setProperties(Object entity, Map<String, Object> propertyMap) {
+        ClassInfo classInfo = resolveClassInfoFor(entity.getClass());
+        for (Entry<String, Object> propertyMapEntry : propertyMap.entrySet()) {
+            writeProperty(classInfo, entity, propertyMapEntry);
         }
     }
 
-    // TODO: the following is all pretty much copied from GraphEntityMapper so should probably be refactored
-    private void writeProperty(ClassInfo classInfo, Object instance, Property<?, ?> property) {
-        PropertyWriter writer = this.entityAccessStrategy.getPropertyWriter(classInfo, property.getKey().toString());
+    private ClassInfo resolveClassInfoFor(Class<?> type) {
+        ClassInfo classInfo = this.metadata.classInfo(type.getSimpleName());
+        if (classInfo != null) {
+            return classInfo;
+        }
+
+        try {
+            String pathToClassFile = type.getCanonicalName().replace('.', '/').concat(".class");
+            return new ClassInfo(type.getClassLoader().getResourceAsStream(pathToClassFile));
+        } catch (IOException e) {
+            throw new MappingException("Error mapping to ad-hoc " + type, e);
+        }
+    }
+
+    // TODO: the following is all pretty much identical to GraphEntityMapper so should probably be refactored
+    private void writeProperty(ClassInfo classInfo, Object instance, Map.Entry<String, Object> property) {
+        PropertyWriter writer = this.entityAccessStrategy.getPropertyWriter(classInfo, property.getKey());
 
         if (writer == null) {
             logger.warn("Unable to find property: {} on class: {} for writing", property.getKey(), classInfo.name());

@@ -57,4 +57,7 @@ public interface UserRepository extends GraphRepository<User> {
     @Query("MATCH (user:User) RETURN id(user) AS userId, user.name AS userName, user.age ORDER BY user.age")
     Iterable<UserQueryResult> retrieveAllUsersAndTheirAges();
 
+    @Query("MATCH (user:User{name:{0}}) RETURN user.name AS name")
+    UnmanagedUserPojo findIndividualUserAsDifferentObject(String name);
+
 }

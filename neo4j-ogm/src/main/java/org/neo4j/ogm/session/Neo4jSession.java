@@ -285,7 +285,7 @@ public class Neo4jSession implements Session {
     }
 
     @Override
-    public Object doInTransaction(GraphCallback graphCallback) {
+    public <T> T doInTransaction(GraphCallback<T> graphCallback) {
         return graphCallback.apply(getRequestHandler(), getOrCreateTransaction(), this.metaData);
     }
 

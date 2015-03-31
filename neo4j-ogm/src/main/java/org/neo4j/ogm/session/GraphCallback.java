@@ -20,9 +20,10 @@ import org.neo4j.ogm.session.transaction.Transaction;
  * A callback interface used to pass functional code to the {@link Session} to be executed in a transaction
  * and with access to the underlying OGM meta-data.
  *
+ * @param <T> The type of object returned from applying this callback
  * @author Adam George
  */
-public interface GraphCallback {
+public interface GraphCallback<T> {
 
     /**
      * Called by the OGM {@link Session} in a transaction to perform some arbitrary database operation.
@@ -32,6 +33,6 @@ public interface GraphCallback {
      * @param metaData The mapping {@link MetaData} that pertains to the current session
      * @return An arbitrary result (or <code>null</code>) based on the desired behaviour of this callback function
      */
-    Object apply(RequestHandler requestHandler, Transaction transaction, MetaData metaData);
+    T apply(RequestHandler requestHandler, Transaction transaction, MetaData metaData);
 
 }

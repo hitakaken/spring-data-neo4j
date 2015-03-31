@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.neo4j.integration.movies.context.PersistenceContext;
 import org.springframework.data.neo4j.integration.movies.domain.User;
 import org.springframework.data.neo4j.integration.movies.domain.UserQueryResult;
+import org.springframework.data.neo4j.integration.movies.repo.UnmanagedUserPojo;
 import org.springframework.data.neo4j.integration.movies.repo.UserRepository;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
@@ -159,13 +160,23 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
         executeUpdate("CREATE (g:User {name:'Gary', age:32}), (s:User {name:'Sheila', age:29}), (v:User {name:'Vince', age:66})");
         assertEquals("There should be some users in the database", 3, userRepository.findTotalUsers());
 
-        // NB: UserQueryResult is not scanned with the other domain classes
         Iterable<UserQueryResult> expected = Arrays.asList(new UserQueryResult("Sheila", 29),
                 new UserQueryResult("Gary", 32), new UserQueryResult("Vince", 66));
 
         Iterable<UserQueryResult> queryResult = userRepository.retrieveAllUsersAndTheirAges();
         assertNotNull("The query result shouldn't be null", queryResult);
         assertEquals(expected, queryResult);
+    }
+
+    @Test
+    public void shouldFindSingleUserAndMapToConcreteQueryResultObject() {
+        executeUpdate("CREATE (:User {name:'Colin'}), (:User {name:'Jeff'})");
+
+        // NB: UserQueryResult is not scanned with the other domain classes
+        // FIXME: this is ONLY working because the setters are annotated (getting a MappingException because of no ID field)
+        UnmanagedUserPojo queryResult = userRepository.findIndividualUserAsDifferentObject("Jeff");
+        assertNotNull("The query result shouldn't be null", queryResult);
+        assertEquals("Jeff", queryResult.getName());
     }
 
     @org.junit.Ignore
