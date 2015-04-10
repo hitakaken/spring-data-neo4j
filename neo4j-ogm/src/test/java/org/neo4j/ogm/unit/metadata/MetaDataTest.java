@@ -12,6 +12,7 @@
 
 package org.neo4j.ogm.unit.metadata;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.ogm.domain.education.Student;
 import org.neo4j.ogm.domain.forum.Member;
@@ -33,7 +34,12 @@ import static org.junit.Assert.*;
  */
 public class MetaDataTest {
 
-    private static final MetaData metaData = new MetaData("org.neo4j.ogm.domain.forum", "org.neo4j.ogm.domain.canonical","org.neo4j.ogm.integration.hierarchy.domain");
+    private MetaData metaData;
+
+    @Before
+    public void setUp() {
+        metaData = new MetaData("org.neo4j.ogm.domain.forum", "org.neo4j.ogm.domain.canonical","org.neo4j.ogm.integration.hierarchy.domain");
+    }
 
     /**
      * A class can be found if its simple name is unique in the domain
@@ -524,7 +530,7 @@ public class MetaDataTest {
 
     @Test
     /**
-     * Taxa corresponding to abstract classes can be resolved
+     * Taxa corresponding to abstract classes can't be resolved
      */
     public void testAbstractClassTaxa() {
         assertEquals(null, metaData.resolve("Membership"));
@@ -585,6 +591,18 @@ public class MetaDataTest {
         ClassInfo nonAnnotatedClassInfo = new MetaData("org.neo4j.ogm.domain.education").classInfo(Student.class.getSimpleName());
         assertEquals(Arrays.asList("Student", "DomainObject"), nonAnnotatedClassInfo.labels());
     }
+
+    @Test
+    public void testClassInfoForAbstractClassImplementingInterface() {
+        assertEquals(1, metaData.classInfo("Membership").interfacesInfo().list().size());
+    }
+
+    @Test
+    public void testClassInfoForAbstractClassImplementingInterfaceName() {
+        assertTrue(metaData.classInfo("Membership").interfacesInfo().list().iterator().next().toString().contains("IMembership"));
+    }
+
+
 
 
 }

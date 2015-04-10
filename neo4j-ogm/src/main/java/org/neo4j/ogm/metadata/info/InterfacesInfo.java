@@ -21,7 +21,7 @@ import java.util.Map;
 /**
  * @author Vince Bickers
  */
-class InterfacesInfo {
+public class InterfacesInfo {
 
     private final Map<String, InterfaceInfo> interfaceMap = new HashMap<>();
 
@@ -39,4 +39,17 @@ class InterfacesInfo {
         return interfaceMap.values();
     }
 
+    public InterfaceInfo get(String interfaceName) {
+        return interfaceMap.get(interfaceName);
+    }
+
+    void add(InterfaceInfo interfaceInfo) {
+        interfaceMap.put(interfaceInfo.name(), interfaceInfo);
+    }
+
+    public void append(InterfacesInfo interfacesInfo) {
+        for (InterfaceInfo interfaceInfo : interfacesInfo.list()) {
+            add(interfaceInfo);
+        }
+    }
 }

@@ -15,6 +15,7 @@ package org.neo4j.ogm.mapper;
 import org.neo4j.ogm.entityaccess.DefaultEntityAccessStrategy;
 import org.neo4j.ogm.entityaccess.EntityAccessStrategy;
 import org.neo4j.ogm.entityaccess.PropertyReader;
+import org.neo4j.ogm.entityaccess.RelationalReader;
 import org.neo4j.ogm.metadata.MetaData;
 import org.neo4j.ogm.metadata.info.ClassInfo;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ import java.util.concurrent.ConcurrentMap;
  * with a session lifetime.
  *
  * @author Vince Bickers
+ * @author Luanne Misquitta
  */
 public class MappingContext {
 
@@ -48,9 +50,7 @@ public class MappingContext {
     private final ConcurrentMap<Long, Object> nodeEntityRegister = new ConcurrentHashMap<>();
     private final Set<MappedRelationship> relationshipRegister = new HashSet<>();
 
-    // in addition we need the following
-    // a typeRegister                   register of all entities of a specific type (including supertypes)
-    // a
+    /** register of all mapped entities of a specific type (including supertypes) */
     private final ConcurrentMap<Class<?>, Set<Object>> typeRegister = new ConcurrentHashMap<>();
     private final EntityMemo objectMemo = new EntityMemo();
 
@@ -94,10 +94,10 @@ public class MappingContext {
         Set<Object> entities = typeRegister.get(type);
         if (entities != null) {
             if (type.getSuperclass() != null
-                && metaData != null
-                && metaData.classInfo(type.getSuperclass().getName()) != null
-                && !type.getSuperclass().getName().equals("java.lang.Object")) {
-            deregisterTypes(type.getSuperclass(), entity);
+                    && metaData != null
+                    && metaData.classInfo(type.getSuperclass().getName()) != null
+                    && !type.getSuperclass().getName().equals("java.lang.Object")) {
+                deregisterTypes(type.getSuperclass(), entity);
             }
         }
     }
@@ -130,7 +130,7 @@ public class MappingContext {
         return objectList;
     }
 
-    // object memoisations
+    // object memorisations
     public void remember(Object entity) {
         objectMemo.remember(entity, metaData.classInfo(entity));
     }
@@ -203,24 +203,28 @@ public class MappingContext {
     }
 
     private void purge(Object entity, PropertyReader identityReader) {
-
-        // remove this object from the nodeEntity/relationshipEntity register (just try both)
         Long id = (Long) identityReader.read(entity);
         if (id != null) {
+            if (nodeEntityRegister.containsValue(entity)) {
+                nodeEntityRegister.remove(id);
 
-            nodeEntityRegister.remove(id);
-            relationshipEntityRegister.remove(id);
-
-            // remove all relationship mappings to/from this object
-            Iterator<MappedRelationship> mappedRelationshipIterator = mappedRelationships().iterator();
-            while (mappedRelationshipIterator.hasNext()) {
-                MappedRelationship mappedRelationship = mappedRelationshipIterator.next();
-                if (mappedRelationship.getStartNodeId() == id || mappedRelationship.getEndNodeId() == id) {
-                    mappedRelationshipIterator.remove();
+                // remove all relationship mappings to/from this object
+                Iterator<MappedRelationship> mappedRelationshipIterator = mappedRelationships().iterator();
+                while (mappedRelationshipIterator.hasNext()) {
+                    MappedRelationship mappedRelationship = mappedRelationshipIterator.next();
+                    if (mappedRelationship.getStartNodeId() == id || mappedRelationship.getEndNodeId() == id) {
+                        mappedRelationshipIterator.remove();
+                    }
                 }
             }
+            if (relationshipEntityRegister.containsValue(entity)) {
+                relationshipEntityRegister.remove(id);
+                RelationalReader startNodeReader = entityAccessStrategy.getStartNodeReader(metaData.classInfo(entity));
+                clear(startNodeReader.read(entity));
+                RelationalReader endNodeReader = entityAccessStrategy.getEndNodeReader(metaData.classInfo(entity));
+                clear(endNodeReader.read(entity));
+            }
         }
-
     }
 
     public void dump() {

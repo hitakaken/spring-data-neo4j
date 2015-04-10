@@ -12,14 +12,15 @@
 
 package org.neo4j.ogm.session.request.strategy;
 
-import org.neo4j.ogm.model.Property;
-import org.neo4j.ogm.cypher.query.GraphModelQuery;
-import org.neo4j.ogm.session.Utils;
-
 import java.util.Collection;
+
+import org.neo4j.ogm.cypher.query.GraphModelQuery;
+import org.neo4j.ogm.model.Property;
+import org.neo4j.ogm.session.Utils;
 
 /**
  * @author Vince Bickers
+ * @author Luanne Misquitta
  */
 public class VariableDepthQuery implements QueryStatements {
 
@@ -27,6 +28,9 @@ public class VariableDepthQuery implements QueryStatements {
     public GraphModelQuery findOne(Long id, int depth) {
         int max = max(depth);
         int min = min(max);
+        if (depth < 0) {
+            return InfiniteDepthReadStrategy.findOne(id);
+        }
         if (max > 0) {
             String qry = String.format("MATCH p=(n)-[*%d..%d]-(m) WHERE id(n) = { id } RETURN collect(distinct p)", min, max);
             return new GraphModelQuery(qry, Utils.map("id", id));
@@ -34,10 +38,14 @@ public class VariableDepthQuery implements QueryStatements {
             return DepthZeroReadStrategy.findOne(id);
         }
     }
+
     @Override
     public GraphModelQuery findAll(Collection<Long> ids, int depth) {
         int max = max(depth);
         int min = min(max);
+        if (depth < 0) {
+            return InfiniteDepthReadStrategy.findAll(ids);
+        }
         if (max > 0) {
             String qry=String.format("MATCH p=(n)-[*%d..%d]-(m) WHERE id(n) in { ids } RETURN collect(distinct p)", min, max);
             return new GraphModelQuery(qry, Utils.map("ids", ids));
@@ -55,8 +63,11 @@ public class VariableDepthQuery implements QueryStatements {
     public GraphModelQuery findByType(String label, int depth) {
         int max = max(depth);
         int min = min(max);
+        if (depth < 0) {
+            return InfiniteDepthReadStrategy.findByLabel(label);
+        }
         if (max > 0) {
-            String qry = String.format("MATCH p=(n:%s)-[*%d..%d]-(m) RETURN collect(distinct p)", label, min, max);
+            String qry = String.format("MATCH p=(n:`%s`)-[*%d..%d]-(m) RETURN collect(distinct p)", label, min, max);
             return new GraphModelQuery(qry, Utils.map());
         } else {
             return DepthZeroReadStrategy.findByLabel(label);
@@ -67,8 +78,11 @@ public class VariableDepthQuery implements QueryStatements {
     public GraphModelQuery findByProperty(String label, Property<String, Object> property, int depth) {
         int max = max(depth);
         int min = min(max);
+        if (depth < 0) {
+            return InfiniteDepthReadStrategy.findByProperty(label, property);
+        }
         if (max > 0) {
-            String qry = String.format("MATCH p=(n:%s)-[*%d..%d]-(m) WHERE n.%s = { %s } RETURN collect(distinct p)", label, min, max, property.getKey(), property.getKey());
+            String qry = String.format("MATCH p=(n:`%s`)-[*%d..%d]-(m) WHERE n.%s = { %s } RETURN collect(distinct p)", label, min, max, property.getKey(), property.getKey());
             return new GraphModelQuery(qry, Utils.map(property.getKey(), property.asParameter()));
         } else {
             return DepthZeroReadStrategy.findByProperty(label, property);
@@ -94,11 +108,31 @@ public class VariableDepthQuery implements QueryStatements {
         }
 
         public static GraphModelQuery findByLabel(String label) {
-            return new GraphModelQuery(String.format("MATCH (n:%s) RETURN collect(n)", label), Utils.map());
+            return new GraphModelQuery(String.format("MATCH (n:`%s`) RETURN collect(n)", label), Utils.map());
         }
 
         public static GraphModelQuery findByProperty(String label, Property<String, Object> property) {
-            return new GraphModelQuery(String.format("MATCH (n:%s) WHERE n.%s = { %s } RETURN collect(n)", label, property.getKey(), property.getKey()), Utils.map(property.getKey(), property.asParameter()));
+            return new GraphModelQuery(String.format("MATCH (n:`%s`) WHERE n.%s = { %s } RETURN collect(n)", label, property.getKey(), property.getKey()), Utils.map(property.getKey(), property.asParameter()));
+        }
+
+    }
+
+    private static class InfiniteDepthReadStrategy {
+
+        public static GraphModelQuery findOne(Long id) {
+            return new GraphModelQuery("MATCH p=(n)-[*0..]-(m) WHERE id(n) = { id } RETURN collect(distinct p)", Utils.map("id", id));
+        }
+
+        public static GraphModelQuery findAll(Collection<Long> ids) {
+            return new GraphModelQuery("MATCH p=(n)-[*0..]-(m) WHERE id(n) in { ids } RETURN collect(distinct p)", Utils.map("ids", ids));
+        }
+
+        public static GraphModelQuery findByLabel(String label) {
+            return new GraphModelQuery(String.format("MATCH p=(n:`%s`)-[*0..]-(m) RETURN collect(distinct p)", label), Utils.map());
+        }
+
+        public static GraphModelQuery findByProperty(String label, Property<String, Object> property) {
+            return new GraphModelQuery(String.format("MATCH p=(n:`%s`)-[*0..]-(m) WHERE n.%s = { %s } RETURN collect(distinct p)", label, property.getKey(), property.getKey()), Utils.map(property.getKey(), property.asParameter()));
         }
 
     }

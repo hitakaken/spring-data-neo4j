@@ -9,25 +9,15 @@
  * code for these subcomponents is subject to the terms and
  * conditions of the subcomponent's license, as noted in the LICENSE file.
  */
-
-package org.neo4j.ogm.session.request.strategy;
-
-import org.neo4j.ogm.cypher.statement.ParameterisedStatement;
-
-import java.util.Collection;
+package org.neo4j.ogm.domain.convertible.enums;
 
 /**
- * @author Vince Bickers
  * @author Luanne Misquitta
  */
-public interface DeleteStatements {
-
-    ParameterisedStatement delete(Long id);
-
-    ParameterisedStatement deleteAll(Collection<Long> ids);
-
-    ParameterisedStatement purge();
-
-    ParameterisedStatement deleteByType(String label);
+public enum Education {
+    HIGHSCHOOL,
+    BACHELORS,
+    MASTERS,
+    PHD
 
 }
