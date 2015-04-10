@@ -12,10 +12,23 @@
 
 package org.springframework.data.neo4j.integration.movies;
 
-import org.neo4j.ogm.testutil.WrappingServerIntegrationTest;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.neo4j.cypher.javacompat.ExecutionEngine;
+import org.neo4j.ogm.metadata.MappingException;
+import org.neo4j.ogm.testutil.WrappingServerIntegrationTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.neo4j.integration.movies.context.PersistenceContext;
 import org.springframework.data.neo4j.integration.movies.domain.User;
@@ -25,15 +38,6 @@ import org.springframework.data.neo4j.integration.movies.repo.UserRepository;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.*;
 
 /**
  * @author Vince Bickers
@@ -168,12 +172,14 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
         assertEquals(expected, queryResult);
     }
 
-    @Test
-    public void shouldFindSingleUserAndMapToConcreteQueryResultObject() {
+    /**
+     * This limitation may be addressed after M2 if there's demand for it.
+     */
+    @Test(expected = MappingException.class)
+    public void shouldThrowMappingExceptionIfQueryResultTypeIsNotManagedInMappingMetadata() {
         executeUpdate("CREATE (:User {name:'Colin'}), (:User {name:'Jeff'})");
 
-        // NB: UserQueryResult is not scanned with the other domain classes
-        // FIXME: this is ONLY working because the setters are annotated (getting a MappingException because of no ID field)
+        // NB: UnmanagedUserPojo is not scanned with the other domain classes
         UnmanagedUserPojo queryResult = userRepository.findIndividualUserAsDifferentObject("Jeff");
         assertNotNull("The query result shouldn't be null", queryResult);
         assertEquals("Jeff", queryResult.getName());

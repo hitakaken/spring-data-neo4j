@@ -12,7 +12,6 @@
 
 package org.springframework.data.neo4j.integration.movies.repo;
 
-import org.neo4j.ogm.annotation.Property;
 import org.springframework.data.neo4j.annotation.QueryResult;
 
 /**
@@ -23,7 +22,6 @@ public class UnmanagedUserPojo {
 
     private String name;
 
-    @Property(name = "name")
     public void setName(String name) {
         this.name = name;
     }

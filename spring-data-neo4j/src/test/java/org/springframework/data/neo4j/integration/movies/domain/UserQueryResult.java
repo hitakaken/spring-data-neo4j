@@ -13,7 +13,6 @@
 package org.springframework.data.neo4j.integration.movies.domain;
 
 import org.apache.commons.lang.builder.ReflectionToStringBuilder;
-import org.neo4j.ogm.annotation.GraphId;
 import org.neo4j.ogm.annotation.Property;
 import org.springframework.data.neo4j.annotation.QueryResult;
 import org.springframework.data.neo4j.integration.movies.repo.UserRepository;
@@ -26,9 +25,6 @@ import org.springframework.data.neo4j.integration.movies.repo.UserRepository;
  */
 @QueryResult
 public class UserQueryResult {
-
-    @GraphId
-    private Long graphId;
 
     private String userName;
     private int age;

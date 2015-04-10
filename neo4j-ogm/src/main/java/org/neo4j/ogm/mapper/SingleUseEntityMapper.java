@@ -55,6 +55,14 @@ public class SingleUseEntityMapper {
         this.entityAccessStrategy = new DefaultEntityAccessStrategy();
     }
 
+    /**
+     * Maps a row-based result onto a new instance of the specified type.
+     *
+     * @param type The {@link Class} denoting the type of object to create
+     * @param columnNames The names of the columns in each row of the result
+     * @param rowModel The {@link RowModel} containing the data to map
+     * @return A new instance of <tt>T</tt> populated with the data in the specified row model
+     */
     public <T> T map(Class<T> type, String[] columnNames, RowModel rowModel) {
         Map<String, Object> properties = new HashMap<>();
         for (int i = 0; i < rowModel.getValues().length; i++) {
@@ -62,11 +70,11 @@ public class SingleUseEntityMapper {
         }
 
         T entity = this.entityFactory.newObject(type);
-        setProperties(entity, properties);
+        setPropertiesOnEntity(entity, properties);
         return entity;
     }
 
-    private void setProperties(Object entity, Map<String, Object> propertyMap) {
+    private void setPropertiesOnEntity(Object entity, Map<String, Object> propertyMap) {
         ClassInfo classInfo = resolveClassInfoFor(entity.getClass());
         for (Entry<String, Object> propertyMapEntry : propertyMap.entrySet()) {
             writeProperty(classInfo, entity, propertyMapEntry);
@@ -78,13 +86,8 @@ public class SingleUseEntityMapper {
         if (classInfo != null) {
             return classInfo;
         }
-
-        try {
-            String pathToClassFile = type.getCanonicalName().replace('.', '/').concat(".class");
-            return new ClassInfo(type.getClassLoader().getResourceAsStream(pathToClassFile));
-        } catch (IOException e) {
-            throw new MappingException("Error mapping to ad-hoc " + type, e);
-        }
+        throw new MappingException("Error mapping to ad-hoc " + type +
+                ".  At present, only @QueryResult types that are discovered by the domain entity package scanning can be mapped.");
     }
 
     // TODO: the following is all pretty much identical to GraphEntityMapper so should probably be refactored

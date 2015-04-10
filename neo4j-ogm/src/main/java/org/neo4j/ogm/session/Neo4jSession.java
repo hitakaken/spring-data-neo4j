@@ -355,10 +355,6 @@ public class Neo4jSession implements Session {
                 CypherContext context = new EntityGraphMapper(metaData, mappingContext).map(object, depth);
                 try (Neo4jResponse<String> response = getRequestHandler().execute(context.getStatements(), tx.url())) {
                     getResponseHandler().updateObjects(context, response, mapper);
-                    Field identityField = classInfo.getField(classInfo.identityField());
-                    Long id = (Long) FieldWriter.read(identityField, object);
-                    // ensure the mapping context has the latest version of this object
-                    //mappingContext.replace(object, id);
                     tx.append(context);
                 }
             } else {
