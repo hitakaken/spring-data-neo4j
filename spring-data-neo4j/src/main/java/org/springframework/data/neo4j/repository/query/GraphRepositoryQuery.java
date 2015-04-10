@@ -12,14 +12,19 @@
 
 package org.springframework.data.neo4j.repository.query;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
+import org.neo4j.ogm.annotation.Property;
 import org.neo4j.ogm.cypher.query.RowModelQuery;
+import org.neo4j.ogm.entityaccess.EntityFactory;
 import org.neo4j.ogm.mapper.SingleUseEntityMapper;
 import org.neo4j.ogm.metadata.MetaData;
 import org.neo4j.ogm.session.GraphCallback;
@@ -67,11 +72,26 @@ public class GraphRepositoryQuery implements RepositoryQuery {
             }
 
             if (concreteType.isAnnotationPresent(QueryResult.class)) {
-                return processQueryResult(concreteType, graphQueryMethod.getQuery(), params);
+
+                if (concreteType.isInterface()) {
+                   Iterable<Map<String, Object>> queryResults = session.query(graphQueryMethod.getQuery(), params);
+                   java.util.List<Object> toReturn = new ArrayList<>();
+                   for (Map<String, Object> map : queryResults) {
+                       toReturn.add(Proxy.newProxyInstance(concreteType.getClassLoader(), new Class<?>[] {concreteType}, new QueryResultProxy(map)));
+                   }
+                   return toReturn;
+                }
+               return processQueryResult(concreteType, graphQueryMethod.getQuery(), params);
             }
             return session.query(concreteType, graphQueryMethod.getQuery(), params);
         } else {
             if (concreteType.isAnnotationPresent(QueryResult.class)) {
+                if (concreteType.isInterface()) {
+                   Iterator<Map<String, Object>> iterator = session.query(graphQueryMethod.getQuery(), params).iterator();
+                   return iterator.hasNext()
+                           ? Proxy.newProxyInstance(concreteType.getClassLoader(), new Class<?>[] { concreteType }, new QueryResultProxy(iterator.next()))
+                           : null;
+                }
                 Collection<?> queryResult = processQueryResult(concreteType, graphQueryMethod.getQuery(), params);
                 return queryResult.isEmpty() ? null : queryResult.iterator().next();
             }
@@ -87,7 +107,7 @@ public class GraphRepositoryQuery implements RepositoryQuery {
                 try (Neo4jResponse<RowModel> response = requestHandler.execute(qry, transaction.url())) {
                     Collection<T> toReturn = new ArrayList<>();
 
-                    SingleUseEntityMapper entityMapper = new SingleUseEntityMapper(metaData);
+                    SingleUseEntityMapper entityMapper = new SingleUseEntityMapper(metaData, new EntityFactory(metaData));
                     for (RowModel rowModel = response.next(); rowModel != null; rowModel = response.next()) {
                         toReturn.add(entityMapper.map(queryResultType, response.columns(), rowModel));
                     }
@@ -135,4 +155,31 @@ public class GraphRepositoryQuery implements RepositoryQuery {
     public GraphQueryMethod getQueryMethod() {
         return graphQueryMethod;
     }
+}
+
+class QueryResultProxy implements java.lang.reflect.InvocationHandler{
+
+    private final Map<String, Object> data;
+
+    public QueryResultProxy(Map<String, Object> map) {
+        this.data = map;
+    }
+
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+//        if (method.isBollocks()) {
+//            log error
+//        }
+        Property annotation = method.getAnnotation(Property.class);
+        String propertyKey;
+        if (annotation == null) {
+            propertyKey = method.getName().substring(3);
+            propertyKey = propertyKey.substring(0,1).toLowerCase().concat(propertyKey.substring(1));
+        }else {
+            propertyKey = annotation.name();
+        }
+
+        return data.get(propertyKey);
+    }
+
 }

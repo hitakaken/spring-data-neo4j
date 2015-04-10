@@ -12,7 +12,6 @@
 
 package org.neo4j.ogm.mapper;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -49,7 +48,7 @@ public class SingleUseEntityMapper {
      *
      * @param mappingMetaData The {@link MetaData} to use for performing mappings
      */
-    public SingleUseEntityMapper(MetaData mappingMetaData) {
+    public SingleUseEntityMapper(MetaData mappingMetaData, EntityFactory entityFactory) {
         this.metadata = mappingMetaData;
         this.entityFactory = new EntityFactory(mappingMetaData);
         this.entityAccessStrategy = new DefaultEntityAccessStrategy();

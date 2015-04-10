@@ -16,8 +16,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -33,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.neo4j.integration.movies.context.PersistenceContext;
 import org.springframework.data.neo4j.integration.movies.domain.User;
 import org.springframework.data.neo4j.integration.movies.domain.UserQueryResult;
+import org.springframework.data.neo4j.integration.movies.domain.UserQueryResultInterface;
 import org.springframework.data.neo4j.integration.movies.repo.UnmanagedUserPojo;
 import org.springframework.data.neo4j.integration.movies.repo.UserRepository;
 import org.springframework.test.annotation.DirtiesContext;
@@ -185,10 +188,14 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
         assertEquals("Jeff", queryResult.getName());
     }
 
-    @org.junit.Ignore
     @Test
     public void shouldFindUsersAndMapThemToProxiedQueryResultInterface() {
-        fail("Need to write this test");
+        executeUpdate("CREATE (:User {name:'Morne', age:30}), (:User {name:'Abraham', age:31}), (:User {name:'Virat', age:27})");
+
+        UserQueryResultInterface result = userRepository.findIndividualUserAsProxiedObject("Abraham");
+        assertNotNull("The query result shouldn't be null", result);
+        assertEquals("The wrong user was returned", "Abraham", result.getNameOfUser());
+        assertEquals("The wrong user was returned", 31, result.getAgeOfUser());
     }
 
 }
