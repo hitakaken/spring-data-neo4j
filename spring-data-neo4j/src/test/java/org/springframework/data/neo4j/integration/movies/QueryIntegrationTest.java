@@ -12,14 +12,8 @@
 
 package org.springframework.data.neo4j.integration.movies;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -176,7 +170,7 @@ public class QueryIntegrationTest extends WrappingServerIntegrationTest {
     }
 
     /**
-     * This limitation may be addressed after M2 if there's demand for it.
+     * This limitation about not handling unmanaged types may be addressed after M2 if there's demand for it.
      */
     @Test(expected = MappingException.class)
     public void shouldThrowMappingExceptionIfQueryResultTypeIsNotManagedInMappingMetadata() {
